@@ -142,7 +142,7 @@ def save_to_txt(list, filepath):
         created_date = doc['page_created_date']
         content = doc['content']
         text_file = f'Title: {title}\nCreated On: {created_date}\n\n{content}'
-        with open(f'{filepath}{filename}', 'w') as f:
+        with open(f'{filepath}{filename}.txt', 'w') as f:
             f.write(text_file)
 
     print(f'Data successfully saved to {filepath}')
