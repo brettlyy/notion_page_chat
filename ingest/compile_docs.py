@@ -138,11 +138,12 @@ def save_to_txt(list, filepath):
     """Take our notion data and build it into txt files with the page title as the name."""
     #write to file
     for doc in list:
-        title = doc['page_title'].replace(" ","").replace("&","and").replace("#","") #remove chars that don't work in titles
+        title = doc['page_title']
+        filename = doc['page_title'].replace(" ","").replace("&","and").replace("#","") #remove chars that don't work in titles
         created_date = doc['page_created_date']
         content = doc['content']
-        text_file = f'{title}\n{created_date}\n\n{content}'
-        with open(f'{filepath}{title}', 'w') as f:
+        text_file = f'Title: {title}\nCreated On: {created_date}\n\n{content}'
+        with open(f'{filepath}{filename}', 'w') as f:
             f.write(text_file)
 
     print(f'Data successfully saved to {filepath}')
