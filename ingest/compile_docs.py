@@ -7,7 +7,6 @@
 import os
 import json
 import requests
-import pandas as pd
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -139,7 +138,7 @@ def save_to_txt(list, filepath):
     #write to file
     for doc in list:
         title = doc['page_title']
-        filename = doc['page_title'].replace(" ","").replace("&","and").replace("#","") #remove chars that don't work in titles
+        filename = doc['page_title'].replace(" ","").replace("&","and").replace("#","").replace("/","_") #remove chars that don't work in titles
         created_date = doc['page_created_date']
         content = doc['content']
         text_file = f'Title: {title}\nCreated On: {created_date}\n\n{content}'
@@ -154,5 +153,5 @@ def save_to_txt(list, filepath):
 
 if __name__ == '__main__':
     pages = get_page_ids(project_url)
-    pages_list = get_document_data()
+    pages_list = get_document_data(pages)
     save_to_txt(pages_list, './../data/')
