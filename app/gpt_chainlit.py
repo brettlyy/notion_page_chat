@@ -12,6 +12,9 @@ from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTempla
 from langchain.llms import openai, HuggingFaceHub
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.memory import ChatMessageHistory, ConversationBufferMemory
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import Chroma
+from langchain.embeddings import HuggingFaceBgeEmbeddings, OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 
 import chainlit as cl
@@ -21,19 +24,21 @@ import chainlit as cl
 ##########################
 
 load_dotenv()
-#openai_token = os.getenv('OPENAI_API_KEY')
-hf_token = os.getenv('hugging_face_token')
+openai_token = os.getenv('OPENAI_API_KEY')
+#hf_token = os.getenv('hugging_face_token')
 
 data_dir = './../data/'
+
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
 ##########################
     #LLM Setup
 ##########################
-repo_id = 'google/flan-t5-xxl'
-llm = HuggingFaceHub(repo_id=repo_id, huggingfacehub_api_token=hf_token, model_kwargs={'temperature': 0.25, 'max_length': 1028})
+#repo_id = 'google/flan-t5-xxl'
+#llm = HuggingFaceHub(repo_id=repo_id, huggingfacehub_api_token=hf_token, model_kwargs={'temperature': 0.25, 'max_length': 1028})
 
-loader = DirectoryLoader(data_dir, glob="*.txt")
-index = VectorstoreIndexCreator().from_loaders([loader])
+#loader = DirectoryLoader(data_dir, glob="*.txt")
+#index = VectorstoreIndexCreator().from_loaders([loader])
 
 system_template = """Use the following pieces of context to answer the users question.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -51,6 +56,7 @@ SOURCES: xyz
 Begin!
 ----------------
 {summaries}"""
+
 messages = [
     SystemMessagePromptTemplate.from_template(system_template),
     HumanMessagePromptTemplate.from_template("{question}"),
@@ -63,10 +69,42 @@ chain_type_kwargs = {"prompt": prompt}
 ##########################
 @cl.on_chat_start
 async def on_chat_start():
-    
+    files = None
+
+    # Wait for the user to upload a file
+    while files == None:
+        files = await cl.AskFileMessage(
+            content="Please upload a text file to begin!",
+            accept=["text/plain"],
+            max_size_mb=20,
+            timeout=180,
+        ).send()
+
+    file = files[0]
+
+    msg = cl.Message(
+        content=f"Processing `{file.name}`...", disable_human_feedback=True
+    )
+    await msg.send()
+
+    # Decode the file
+    text = file.content.decode("utf-8")
+
     #load documents 
-    loader = DirectoryLoader(data_dir, glob="*.txt")
-    docs = loader.load()[0]
+    # loader = DirectoryLoader(data_dir, glob="*.txt")
+    # docs = loader.load()
+
+    #split docs into chunks
+    texts = text_splitter.split_text(text)
+
+    #create metadata for each chunk
+    metadatas = [{"source": f"{i}-pl"} for i in range(len(texts))]
+
+    #create a Chroma vector store
+    embeddings = OpenAIEmbeddings()
+    docsearch = await cl.make_async(Chroma.from_texts)(
+        texts, embeddings, metadatas=metadatas
+    )
 
     message_history = ChatMessageHistory()
 
@@ -81,10 +119,16 @@ async def on_chat_start():
     chain = ConversationalRetrievalChain.from_llm(
         ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0, streaming=True),
         chain_type="stuff",
-        retriever=docs.as_retriever(),
+        retriever=docsearch.as_retriever(),
         memory=memory,
         return_source_documents=True,
     )
+
+    # Let the user know that the system is ready
+    msg.content = f"Processing `{file.name}`... \n...done. You can now ask questions!"
+    await msg.update()
+
+    cl.user_session.set("chain", chain)
 
 @cl.on_message
 async def main(message: cl.Message):
@@ -112,7 +156,5 @@ async def main(message: cl.Message):
         else:
             answer += "\nNo sources found"
     # Send a response back to the user
-    await cl.Message(
-        content=f"Received: {message.content}",
-    ).send()
+    await cl.Message(content=answer, elements=text_elements).send()
 
