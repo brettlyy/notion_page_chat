@@ -2,8 +2,7 @@ import os
 import sys
 from dotenv import load_dotenv
 
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+from typing import Optional
 
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders import DirectoryLoader
@@ -67,6 +66,15 @@ chain_type_kwargs = {"prompt": prompt}
 ##########################
     #App Setup
 ##########################
+@cl.password_auth_callback
+def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
+  # Fetch the user matching username from your database
+  # and compare the hashed password with the value stored in the database
+  if (username, password) == ("admin", "admin"):
+    return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
+  else:
+    return None
+
 @cl.on_chat_start
 async def on_chat_start():
 
