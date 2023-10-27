@@ -31,6 +31,30 @@ data_dir = './../data/'
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
 ##########################
+    #Doc Setup
+##########################
+#load documents 
+loader = DirectoryLoader(data_dir, glob="*.txt")
+docs = loader.load()
+
+#for each document pulled, loop through it and split the text, saving it to a list
+docs_list = []
+for doc in docs:
+    text = text_splitter.split_text(doc.page_content) #drill into the content to split
+    docs_list.append(text)
+#now merge these sublists back together
+texts = [item for sublist in docs_list for item in sublist]
+
+#create metadata for each chunk
+metadatas = [{"source": f"{i+1}-pl"} for i in range(len(texts))]
+
+#create a Chroma vector store
+embeddings = OpenAIEmbeddings()
+docsearch = Chroma.from_texts(
+    texts, embeddings, metadatas=metadatas
+)
+
+##########################
     #LLM Setup
 ##########################
 #repo_id = 'google/flan-t5-xxl'
@@ -78,26 +102,26 @@ def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
 @cl.on_chat_start
 async def on_chat_start():
 
-    #load documents 
-    loader = DirectoryLoader(data_dir, glob="*.txt")
-    docs = loader.load()
+    # #load documents 
+    # loader = DirectoryLoader(data_dir, glob="*.txt")
+    # docs = loader.load()
 
-    #for each document pulled, loop through it and split the text, saving it to a list
-    docs_list = []
-    for doc in docs:
-        text = text_splitter.split_text(doc.page_content) #drill into the content to split
-        docs_list.append(text)
-    #now merge these sublists back together
-    texts = [item for sublist in docs_list for item in sublist]
+    # #for each document pulled, loop through it and split the text, saving it to a list
+    # docs_list = []
+    # for doc in docs:
+    #     text = text_splitter.split_text(doc.page_content) #drill into the content to split
+    #     docs_list.append(text)
+    # #now merge these sublists back together
+    # texts = [item for sublist in docs_list for item in sublist]
 
-    #create metadata for each chunk
-    metadatas = [{"source": f"{i+1}-pl"} for i in range(len(texts))]
+    # #create metadata for each chunk
+    # metadatas = [{"source": f"{i+1}-pl"} for i in range(len(texts))]
 
-    #create a Chroma vector store
-    embeddings = OpenAIEmbeddings()
-    docsearch = await cl.make_async(Chroma.from_texts)(
-        texts, embeddings, metadatas=metadatas
-    )
+    # #create a Chroma vector store
+    # embeddings = OpenAIEmbeddings()
+    # docsearch = await cl.make_async(Chroma.from_texts)(
+    #     texts, embeddings, metadatas=metadatas
+    # )
 
     message_history = ChatMessageHistory()
 
