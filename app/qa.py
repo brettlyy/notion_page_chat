@@ -94,8 +94,8 @@ chain_type_kwargs = {"prompt": prompt}
 def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
   # Fetch the user matching username from your database
   # and compare the hashed password with the value stored in the database
-  if (username, password) == ("Susan", "admin"):
-    return cl.AppUser(username="Susan", role="ADMIN", provider="credentials")
+  if (username, password) == ("Micah", "admin"):
+    return cl.AppUser(username="Micah", role="ADMIN", provider="credentials")
   else:
     return None
   
