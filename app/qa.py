@@ -94,34 +94,18 @@ chain_type_kwargs = {"prompt": prompt}
 def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
   # Fetch the user matching username from your database
   # and compare the hashed password with the value stored in the database
-  if (username, password) == ("admin", "admin"):
-    return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
+  if (username, password) == ("Susan", "admin"):
+    return cl.AppUser(username="Susan", role="ADMIN", provider="credentials")
   else:
     return None
+  
+@cl.author_rename
+def rename(orig_author: str):
+    rename_dict = {"Chatbot": "Botanica"}
+    return rename_dict.get(orig_author, orig_author)
 
 @cl.on_chat_start
 async def on_chat_start():
-
-    # #load documents 
-    # loader = DirectoryLoader(data_dir, glob="*.txt")
-    # docs = loader.load()
-
-    # #for each document pulled, loop through it and split the text, saving it to a list
-    # docs_list = []
-    # for doc in docs:
-    #     text = text_splitter.split_text(doc.page_content) #drill into the content to split
-    #     docs_list.append(text)
-    # #now merge these sublists back together
-    # texts = [item for sublist in docs_list for item in sublist]
-
-    # #create metadata for each chunk
-    # metadatas = [{"source": f"{i+1}-pl"} for i in range(len(texts))]
-
-    # #create a Chroma vector store
-    # embeddings = OpenAIEmbeddings()
-    # docsearch = await cl.make_async(Chroma.from_texts)(
-    #     texts, embeddings, metadatas=metadatas
-    # )
 
     message_history = ChatMessageHistory()
 
