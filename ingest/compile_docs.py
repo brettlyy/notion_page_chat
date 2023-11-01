@@ -83,7 +83,7 @@ def get_document_data(page_ids):
             except IndexError:
                 block_type = ''
 
-            #skip if block_type one of the types we won't use
+            #skip if block_type one of the types that doesn't produce clean text content
             if block_type in ['table','divider','column_list','child_page','image','']:
                 continue
 
@@ -140,6 +140,7 @@ def save_to_txt(list, filepath):
         title = doc['page_title']
         filename = doc['page_title'].replace(" ","").replace("&","and").replace("#","").replace("/","_") #remove chars that don't work in titles
         created_date = doc['page_created_date']
+        last_edit_date = doc['page_last_update_date']
         content = doc['content']
         text_file = f'Title: {title}\nCreated On: {created_date}\n\n{content}'
         with open(f'{filepath}{filename}.txt', 'w') as f:
