@@ -4,11 +4,12 @@ from dotenv import load_dotenv
 
 from typing import Optional
 
-from langchain.document_loaders import TextLoader
+#from langchain.document_loaders import TextLoader
 from langchain.document_loaders import DirectoryLoader
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.llms import openai, HuggingFaceHub
+from langchain.llms import openai
+#from langchain.llms import HuggingFaceHub
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.memory import ChatMessageHistory, ConversationBufferMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -29,6 +30,8 @@ openai_token = os.getenv('OPENAI_API_KEY')
 data_dir = './../data/'
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+
+bot_name = 'Notion Assistant'
 
 ##########################
     #Doc Setup
@@ -57,11 +60,6 @@ docsearch = Chroma.from_texts(
 ##########################
     #LLM Setup
 ##########################
-#repo_id = 'google/flan-t5-xxl'
-#llm = HuggingFaceHub(repo_id=repo_id, huggingfacehub_api_token=hf_token, model_kwargs={'temperature': 0.25, 'max_length': 1028})
-
-#loader = DirectoryLoader(data_dir, glob="*.txt")
-#index = VectorstoreIndexCreator().from_loaders([loader])
 
 system_template = """Use the following pieces of context to answer the users question.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -94,14 +92,14 @@ chain_type_kwargs = {"prompt": prompt}
 def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
   # Fetch the user matching username from your database
   # and compare the hashed password with the value stored in the database
-  if (username, password) == ("Micah", "admin"):
-    return cl.AppUser(username="Micah", role="ADMIN", provider="credentials")
+  if (username, password) == ("admin", "admin"):
+    return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
   else:
     return None
   
 @cl.author_rename
 def rename(orig_author: str):
-    rename_dict = {"Chatbot": "Botanica"}
+    rename_dict = {"Chatbot": {bot_name}}
     return rename_dict.get(orig_author, orig_author)
 
 @cl.on_chat_start
