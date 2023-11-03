@@ -1,7 +1,16 @@
-# Garden Journal
+# Notion Assistant
 
-🌿 Hi! I'm Botanica, the green thumb AI behind your garden journal. Just like a master gardener tends to their plants, I'm here to help you nurture the well-being of your team, foster collaboration, and cultivate projects that yield a bountiful harvest of success.
+Hi! This is an app to help you work smarter with your notion content and maybe learn some Chainlit along the way!
 
-🌻 Wondering how this digital garden grows? It's as effortless as the gentle breeze rustling through leaves. You can interact with me in this chat-based interface to unearth valuable insights from your documents and sow the seeds of fresh ideas for building teamwork and collaboration.
+## How it Works
 
-🌱 Ready to get started? Simply type your first question or request, and let's cultivate a garden of prosperity and discovery together!
+Make sure you have setup your API tokens for Notion, Chainlit, & OpenAI, setup access to your Notion page(s), and run the compile_docs.py script.
+
+This process pulls information from your notion, builds text files from the content, and saves it in a vector database so the Notion Assistant can search for answers from the documents.
+
+Simply start by typing a question below!
+
+## Helpful Links
+
+[📄 Chainlit Documentation](https://docs.chainlit.io/get-started/overview)
+[⛭ Chainlit Github](https://github.com/Chainlit/chainlit/tree/main)
