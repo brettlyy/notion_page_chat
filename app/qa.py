@@ -31,7 +31,7 @@ data_dir = './../data/'
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
-bot_name = 'Notion Assistant'
+#bot_name = 'Notion Assistant'
 
 ##########################
     #Doc Setup
@@ -97,10 +97,10 @@ def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
   else:
     return None
   
-@cl.author_rename
-def rename(orig_author: str):
-    rename_dict = {"Chatbot": {bot_name}}
-    return rename_dict.get(orig_author, orig_author)
+# @cl.author_rename
+# def rename(orig_author: str):
+#     rename_dict = {"Chatbot": {bot_name}}
+#     return rename_dict.get(orig_author, orig_author)
 
 @cl.on_chat_start
 async def on_chat_start():
