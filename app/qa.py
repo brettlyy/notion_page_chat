@@ -4,20 +4,19 @@ from dotenv import load_dotenv
 
 from typing import Optional
 
-#from langchain.document_loaders import TextLoader
-from langchain.document_loaders import DirectoryLoader
-from langchain.indexes import VectorstoreIndexCreator
-from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.llms import openai
-#from langchain.llms import HuggingFaceHub
-from langchain.chains import LLMChain, ConversationalRetrievalChain
-from langchain.memory import ChatMessageHistory, ConversationBufferMemory
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import DirectoryLoader
 from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceBgeEmbeddings, OpenAIEmbeddings
+from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
+from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain.docstore.document import Document
+from langchain.memory import ChatMessageHistory, ConversationBufferMemory
 
 import chainlit as cl
+
+
 
 ##########################
     #Variables
@@ -25,12 +24,12 @@ import chainlit as cl
 
 load_dotenv()
 openai_token = os.getenv('OPENAI_API_KEY')
-#hf_token = os.getenv('hugging_face_token')
 
 data_dir = './../data/'
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
+#--unhide the bot_name variable and the @cl.author_rename below to change the name of the bot. You can also do this in the config.toml file.
 #bot_name = 'Notion Assistant'
 
 ##########################
