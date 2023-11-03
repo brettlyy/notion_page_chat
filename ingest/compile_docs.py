@@ -130,7 +130,7 @@ def get_document_data(page_ids):
     return structured_document_list
 
 #################################
-        #SAVE AS JSON
+        #SAVE AS TEXT
 #################################
 
 def save_to_txt(list, filepath):
