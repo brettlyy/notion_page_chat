@@ -16,7 +16,7 @@ from langchain.llms import openai, HuggingFaceHub
 ##########################
 load_dotenv()
 #openai_token = os.getenv('OPENAI_API_KEY')
-hf_token = os.getenv('hugging_face_token')
+hf_token = os.getenv('HUGGINGFACEHUB_API_TOKEN')
 
 data_dir = './../data/'
 
