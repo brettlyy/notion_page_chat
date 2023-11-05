@@ -12,5 +12,5 @@ Simply start by typing a question below!
 
 ## Helpful Links
 
-[📄 Chainlit Documentation](https://docs.chainlit.io/get-started/overview)
+[Chainlit Documentation](https://docs.chainlit.io/get-started/overview)
 [Document Question & Answer Tempalte](https://docs.chainlit.io/examples/qa)
