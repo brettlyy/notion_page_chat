@@ -25,7 +25,7 @@ import chainlit as cl
 load_dotenv()
 openai_token = os.getenv('OPENAI_API_KEY')
 
-data_dir = './../data/'
+data_dir = 'data/'
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
