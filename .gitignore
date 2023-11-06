@@ -165,6 +165,6 @@ cython_debug/
 #models
 model/
 
-# Files under data (but keep empty folders)
+# Files under data (but keep empty data folder to show)
 data/*
 !data/ .gitkeep
