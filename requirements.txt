@@ -11,4 +11,3 @@ ctransformers
 Markdown
 tiktoken
 openai
-dotenv
