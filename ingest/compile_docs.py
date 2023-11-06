@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 ###############################
 
 load_dotenv()
-api_token = os.getenv('hh_notion_token')
+api_token = os.getenv('NOTION_TOKEN')
 
 notion_request_headers = {
     "Authorization": f"Bearer {api_token}",
@@ -84,7 +84,7 @@ def get_document_data(page_ids):
                 block_type = ''
 
             #skip if block_type one of the types that doesn't produce clean text content
-            if block_type in ['table','divider','column_list','child_page','image','']:
+            if block_type in ['table','divider','column_list','child_page','image','child_database','']:
                 continue
 
             #loop through annotations within block content of the types we want
@@ -126,7 +126,6 @@ def get_document_data(page_ids):
             }
 
         structured_document_list.append(page_content)
-
     return structured_document_list
 
 #################################
