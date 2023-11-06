@@ -11,19 +11,14 @@ import chainlit as cl
 #   else:
 #     return None
   
-@cl.password_auth_callback
-def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
-  # Fetch the user matching username from your database
-  # and compare the hashed password with the value stored in the database
-  if (username, password) == ("Micah", "admin"):
-    return cl.AppUser(username="Micah", role="ADMIN", provider="credentials")
-  else:
-    return None
-
-@cl.author_rename
-def rename(orig_author: str):
-    rename_dict = {"Chatbot": "Botanica"}
-    return rename_dict.get(orig_author, orig_author)
+# @cl.password_auth_callback
+# def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
+#   # Fetch the user matching username from your database
+#   # and compare the hashed password with the value stored in the database
+#   if (username, password) == ("Micah", "admin"):
+#     return cl.AppUser(username="Micah", role="ADMIN", provider="credentials")
+#   else:
+#     return None
 
 @cl.action_callback("action_button")
 async def on_action(action):
