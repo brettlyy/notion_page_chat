@@ -11,7 +11,7 @@ This process pulls information from your notion, builds text files from the cont
 Once your API keys are setup - simply ask a question below!
 
 ## API Keys
-[Notion Itegration Setup](https://www.notion.so/my-integrations)
+[Notion Integration Setup](https://www.notion.so/my-integrations)
 [OpenAI API Key Setup](https://platform.openai.com/account/api-keys)
 
 ## Helpful Links
