@@ -87,15 +87,18 @@ chain_type_kwargs = {"prompt": prompt}
 ##########################
     #App Setup
 ##########################
-@cl.password_auth_callback
-def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
-  # Fetch the user matching username from your database
-  # and compare the hashed password with the value stored in the database
-  if (username, password) == ("admin", "admin"):
-    return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
-  else:
-    return None
-  
+
+##-->Unhide below to include login (need to setup chainlit cloud), necessary for chat history and feedback
+# @cl.password_auth_callback
+# def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
+#   # Fetch the user matching username from your database
+#   # and compare the hashed password with the value stored in the database
+#   if (username, password) == ("admin", "admin"):
+#     return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
+#   else:
+#     return None
+
+##-->Unhide below to change bot name
 # @cl.author_rename
 # def rename(orig_author: str):
 #     rename_dict = {"Chatbot": {bot_name}}
