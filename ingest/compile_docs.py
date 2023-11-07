@@ -26,7 +26,7 @@ notion_request_headers = {
 
 project_url = 'https://api.notion.com/v1/search'
 
-doc_directory = './../data/docs'
+doc_directory = './../data/docs/'
 
 ################################
         #PULL PAGE IDs
