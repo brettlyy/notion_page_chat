@@ -167,5 +167,6 @@ model/
 
 # Files under data (but keep empty data folder to show)
 data/*
-data/*/
 !data/.gitkeep
+data/chroma_db/*
+!data/chroma_db/.gitkeep
