@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 ###############################
-        #SETUP API VARIABLES
+        #SETUP VARIABLES
 ###############################
 
 load_dotenv()
@@ -25,6 +25,8 @@ notion_request_headers = {
 }
 
 project_url = 'https://api.notion.com/v1/search'
+
+doc_directory = './../data/docs'
 
 ################################
         #PULL PAGE IDs
@@ -154,4 +156,4 @@ def save_to_txt(list, filepath):
 if __name__ == '__main__':
     pages = get_page_ids(project_url)
     pages_list = get_document_data(pages)
-    save_to_txt(pages_list, './../data/')
+    save_to_txt(pages_list, doc_directory)
