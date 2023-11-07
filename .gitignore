@@ -166,6 +166,7 @@ cython_debug/
 model/
 
 # Files under data (but keep empty data folder to show)
+/data/
 data/docs/*
 !data/docs/.gitkeep
 data/chroma_db/*
