@@ -29,7 +29,7 @@ data_dir = 'data/'
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
-#--unhide the bot_name variable and the @cl.author_rename below to change the name of the bot. You can also do this in the config.toml file.
+##-->unhide the bot_name variable and the @cl.author_rename below to change the name of the bot. You can also do this in the config.toml file.
 #bot_name = 'Notion Assistant'
 
 ##########################
