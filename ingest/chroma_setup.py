@@ -27,6 +27,7 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=10
 
 ##########################
     #Doc Setup
+    #Take our pages and split them into texts for better performance on large documents
 ##########################
 #load documents 
 loader = DirectoryLoader(data_dir, glob="*.txt")
@@ -37,7 +38,8 @@ docs_list = []
 for doc in docs:
     text = text_splitter.split_text(doc.page_content) #drill into the content to split
     docs_list.append(text)
-#now merge these sublists back together
+
+#now merge these sublists back together to create our texts
 texts = [item for sublist in docs_list for item in sublist]
 
 #create metadata for each chunk to provide a source to pull
