@@ -30,7 +30,7 @@ data_dir = './data/docs/'
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
 ##-->unhide the bot_name variable and the @cl.author_rename below to change the name of the bot. You can also do this in the config.toml file.
-#bot_name = 'Notion Assistant'
+bot_name = 'Notion Assistant'
 
 ##########################
     #Doc Setup
@@ -99,10 +99,10 @@ chain_type_kwargs = {"prompt": prompt}
 #     return None
 
 ##-->Unhide below to change bot name
-# @cl.author_rename
-# def rename(orig_author: str):
-#     rename_dict = {"Chatbot": {bot_name}}
-#     return rename_dict.get(orig_author, orig_author)
+@cl.author_rename
+def rename(orig_author: str):
+    rename_dict = {"Chatbot": {bot_name}}
+    return rename_dict.get(orig_author, orig_author)
 
 @cl.on_chat_start
 async def on_chat_start():
