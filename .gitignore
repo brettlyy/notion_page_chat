@@ -171,3 +171,6 @@ data/docs/*
 !data/docs/.gitkeep
 data/chroma_db/*
 !data/chroma_db/.gitkeep
+
+# Chainlit
+.chainlit/

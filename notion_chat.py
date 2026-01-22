@@ -7,10 +7,12 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_chroma import Chroma
-from langchain_classic.chains import RetrievalQA
-from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from langchain_community.chat_message_histories.in_memory import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 
 import chainlit as cl
 
@@ -21,7 +23,7 @@ load_dotenv()
 openai_token = os.getenv('OPENAI_API_KEY')
 
 data_dir = './data/docs/'
-chroma_dir = './../data/chroma_db'  # persistent Chroma store
+chroma_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), './data/chroma_db'))
 file_tracker_path = os.path.join(chroma_dir, "file_tracker.json")
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
@@ -40,6 +42,12 @@ def save_file_tracker(tracker):
     os.makedirs(chroma_dir, exist_ok=True)
     with open(file_tracker_path, "w") as f:
         json.dump(tracker, f)
+
+def format_source_snippet(doc, max_chars=300):
+    text = doc.page_content.strip().replace("\n", " ")
+    if len(text) > max_chars:
+        text = text[:max_chars] + "..."
+    return text
 
 ##########################
 # Build / load Chroma vector store incrementally
@@ -65,21 +73,64 @@ else:
 loader = DirectoryLoader(data_dir, glob="*.txt")
 docs = loader.load()
 
+# Parse metadata from file headers
+def parse_metadata_from_content(doc):
+    """Extract metadata from --- header if present"""
+    content = doc.page_content
+    metadata = doc.metadata.copy()
+    
+    if content.startswith("---"):
+        # Find the end of the metadata block
+        end_idx = content.find("---", 3)
+        if end_idx != -1:
+            metadata_block = content[3:end_idx].strip()
+            # Parse key: value pairs
+            for line in metadata_block.split("\n"):
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    metadata[key.strip()] = value.strip()
+            # Remove metadata from content
+            doc.page_content = content[end_idx + 3:].strip()
+    
+    doc.metadata = metadata
+    return doc
+
+docs = [parse_metadata_from_content(doc) for doc in docs]
+
 texts_to_add = []
 metadatas_to_add = []
 ids_to_add = []
 
 for doc in docs:
-    file_path = doc.metadata["source"]  # DirectoryLoader sets 'source' to file path
+    file_path = doc.metadata["source"]
     file_mod_time = os.path.getmtime(file_path)
 
     # Only process if new or updated
     if file_path not in file_tracker or file_tracker[file_path] < file_mod_time:
         chunks = text_splitter.split_text(doc.page_content)
+        
+        # Extract metadata from original doc (notion_url, notion_id, etc.)
+        metadata_base = {
+            "source": os.path.basename(file_path),
+            "file_path": file_path
+        }
+        
+        # Copy over any additional metadata from the original document
+        for key in ["notion_url", "notion_id", "title", "url"]:
+            if key in doc.metadata:
+                metadata_base[key] = doc.metadata[key]
+        
         texts_to_add.extend(chunks)
-        metadatas_to_add.extend([{"source": os.path.basename(file_path)} for _ in chunks])
-        ids_to_add.extend([str(uuid.uuid5(uuid.NAMESPACE_DNS, os.path.basename(file_path) + str(i)))
-                           for i in range(len(chunks))])
+        metadatas_to_add.extend([metadata_base.copy() for _ in chunks])
+        ids_to_add.extend([
+            str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_DNS,
+                    f"{file_path}:{i}"
+                )
+            )
+            for i in range(len(chunks))
+        ])
         file_tracker[file_path] = file_mod_time
 
 # Add new texts to Chroma
@@ -96,7 +147,6 @@ if texts_to_add:
     else:
         print(f"Adding {len(texts_to_add)} new chunks to Chroma store...")
         docsearch.add_texts(texts_to_add, metadatas=metadatas_to_add, ids=ids_to_add)
-        docsearch.persist()
     save_file_tracker(file_tracker)
     print("Chroma store updated and file tracker saved.")
 else:
@@ -113,6 +163,7 @@ def rename(orig_author: str):
 ##########################
 # Chainlit: chat start
 ##########################
+
 # Session-based in-memory chat histories
 session_histories = {}
 
@@ -123,54 +174,105 @@ def get_history(session_id: str):
 
 @cl.on_chat_start
 async def on_chat_start():
-    # Build your RetrievalQA chain (classic)
-    base_chain = RetrievalQA.from_chain_type(
-        llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0, streaming=True),
-        chain_type="stuff",
-        retriever=docsearch.as_retriever(),
-        return_source_documents=True,
+    llm = ChatOpenAI(
+        model_name="gpt-4o-mini",
+        temperature=0
     )
 
-    # Wrap it with RunnableWithMessageHistory to handle per-session chat history
-    chain = RunnableWithMessageHistory(
-        base_chain,
-        get_session_history=get_history,
-        input_messages_key="question",    # key for user input in the chain
-        history_messages_key="chat_history"  # key where chat history will be injected
-    )
+    if docsearch is None:
+        await cl.Message(
+            content="Document index is not ready. Please refresh in a moment."
+        ).send()
+        return
 
-    cl.user_session.set("chain", chain)
+    retriever = docsearch.as_retriever(search_kwargs={"k": 4})
+
+    print(f"Chroma loaded with {docsearch._collection.count()} chunks")
+
+    # Store in Chainlit session
+    cl.user_session.set("llm", llm)
+    cl.user_session.set("retriever", retriever)
 
 ##########################
 # Chainlit: message handler
 ##########################
 @cl.on_message
 async def main(message: cl.Message):
-    chain: RunnableWithMessageHistory = cl.user_session.get("chain")
-    cb = cl.AsyncLangchainCallbackHandler()
+    llm = cl.user_session.get("llm")
+    retriever = cl.user_session.get("retriever")
+    session_id = cl.user_session.get("id")
+    
+    # Get chat history
+    history = get_history(session_id)
+    
+    # Retrieve relevant documents
+    docs = retriever.invoke(message.content)
+    print(f"[DEBUG] Retrieved {len(docs)} docs:",
+          [d.metadata.get("source", "unknown") for d in docs])
+    
+    # Debug: print metadata
+    for doc in docs[:1]:  # Just print first doc's metadata
+        print(f"[DEBUG] Metadata keys: {doc.metadata.keys()}")
+        print(f"[DEBUG] Full metadata: {doc.metadata}")
+    
+    # Format context from retrieved docs
+    context = "\n\n".join(doc.page_content for doc in docs)
+    
+    # Build the prompt with chat history
+    messages = [
+        ("system", 
+         "You are a helpful assistant. Answer using ONLY the provided context. "
+         "If no relevant context is provided, say you do not know.\n\n"
+         f"Context:\n{context}")
+    ]
+    
+    # Add chat history
+    for msg in history.messages:
+        if isinstance(msg, HumanMessage):
+            messages.append(("human", msg.content))
+        elif isinstance(msg, AIMessage):
+            messages.append(("assistant", msg.content))
+    
+    # Add current question
+    messages.append(("human", message.content))
+    
+    # Create prompt and invoke WITHOUT streaming callback
+    prompt = ChatPromptTemplate.from_messages(messages)
+    chain = prompt | llm | StrOutputParser()
+    
+    answer = await chain.ainvoke({})
+    
+    # Update chat history
+    history.add_message(HumanMessage(content=message.content))
+    history.add_message(AIMessage(content=answer))
+    
+    # Format sources with clickable links
+    sources_list = []
+    sources_seen = set()
+    
+    if docs:
+        for source_doc in docs:
+            source_name = source_doc.metadata.get('source', 'document')
+            
+            # Skip duplicate sources
+            if source_name in sources_seen:
+                continue
+            sources_seen.add(source_name)
+            
+            # Get Notion URL from metadata
+            notion_url = source_doc.metadata.get('notion_url')
+            title = source_doc.metadata.get('title', source_name)
+            
+            print(f"[DEBUG] Source: {source_name}, URL: {notion_url}")
+            
+            if notion_url:
+                # Create markdown link
+                sources_list.append(f"- [{title}]({notion_url})")
+            else:
+                # Fallback to just the name
+                sources_list.append(f"- {source_name}")
+        
+        if sources_list:
+            answer += "\n\n**Sources:**\n" + "\n".join(sources_list)
 
-    # Use the Chainlit session ID to fetch the correct history
-    session_id = cl.user_session.get_id()
-    res = await chain.invoke(
-        {"question": message.content},
-        config={"configurable": {"session_id": session_id}},
-        callbacks=[cb]
-    )
-
-    answer = res["answer"]
-    source_documents = res.get("source_documents", [])
-
-    text_elements = []
-    if source_documents:
-        for idx, source_doc in enumerate(source_documents):
-            source_name = f"source_{idx}"
-            text_elements.append(
-                cl.Text(content=source_doc.page_content, name=source_name)
-            )
-        source_names = [text_el.name for text_el in text_elements]
-        if source_names:
-            answer += f"\nSources: {', '.join(source_names)}"
-        else:
-            answer += "\nNo sources found"
-
-    await cl.Message(content=answer, elements=text_elements).send()
+    await cl.Message(content=answer).send()

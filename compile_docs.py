@@ -26,7 +26,7 @@ notion_request_headers = {
 
 project_url = 'https://api.notion.com/v1/search'
 
-doc_directory = './../data/docs/'
+doc_directory = './data/docs/'
 
 # these blocks don't produce clean text, so skip them
 blocks_to_skip = ['divider','image','child_database','', 'file']
@@ -117,6 +117,9 @@ def get_document_data(page_id):
 
     print(f"Processing page: {page_title} (id: {page_id})")
 
+    # Get the page URL from the response
+    notion_url = page.get('url', '')
+
     # Fetch all blocks recursively
     blocks = fetch_blocks_recursively(page_id, notion_request_headers)
 
@@ -161,6 +164,7 @@ def get_document_data(page_id):
     return {
         'page_id': page_id,
         'page_title': page_title,
+        'notion_url': notion_url,
         'content': "".join(block_content_list)  # preserves newlines
     }
 
@@ -172,10 +176,20 @@ def get_document_data(page_id):
 def save_to_txt(docs, filepath):
     for doc in docs:
         filename = doc['page_title'].replace(" ","").replace("&","and").replace("#","").replace("/","_")
-        text_file = f"Title: {doc['page_title']}\n\n{doc['content']}"
+        
+        # Create metadata header
+        metadata = f"""---
+notion_url: {doc['notion_url']}
+notion_id: {doc['page_id']}
+title: {doc['page_title']}
+---
+
+"""
+        
+        text_file = f"{metadata}Title: {doc['page_title']}\n\n{doc['content']}"
         with open(f"{filepath}{filename}.txt", "w") as f:
             f.write(text_file)
-        print(f"Saved {filename}.txt")
+        print(f"Saved {filename}.txt with URL: {doc['notion_url']}")
 
 #################################
 # MAIN
