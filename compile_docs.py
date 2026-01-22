@@ -197,15 +197,12 @@ title: {doc['page_title']}
 
 if __name__ == "__main__":
     # Get all pages under root
-    #page_ids = get_page_ids()
+    page_ids = get_page_ids()
 
     all_docs = []
-    # for page_id in page_ids:
-    #     doc = get_document_data(page_id)
-    #     all_docs.append(doc)
-
-    doc = get_document_data("2c21cd0c-6137-80df-8018-d3a219ae91b0")
-    all_docs.append(doc)
+    for page_id in page_ids:
+        doc = get_document_data(page_id)
+        all_docs.append(doc)
 
     save_to_txt(all_docs, doc_directory)
 
