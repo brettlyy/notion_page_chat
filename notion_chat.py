@@ -1,157 +1,176 @@
 import os
-import sys
+import json
+import uuid
 from dotenv import load_dotenv
 
-from typing import Optional
-
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import DirectoryLoader
-from langchain.vectorstores import Chroma
-from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.docstore.document import Document
-from langchain.memory import ChatMessageHistory, ConversationBufferMemory
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_chroma import Chroma
+from langchain_classic.chains import RetrievalQA
+from langchain_core.documents import Document
+from langchain_community.chat_message_histories.in_memory import ChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 
 import chainlit as cl
 
-
-
 ##########################
-    #Variables
+# Variables
 ##########################
-
 load_dotenv()
 openai_token = os.getenv('OPENAI_API_KEY')
 
 data_dir = './data/docs/'
+chroma_dir = './../data/chroma_db'  # persistent Chroma store
+file_tracker_path = os.path.join(chroma_dir, "file_tracker.json")
 
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-
-##-->unhide the bot_name variable and the @cl.author_rename below to change the name of the bot. You can also do this in the config.toml file.
-bot_name = 'Notion Assistant'
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+bot_name = "Notion Assistant"
 
 ##########################
-    #Doc Setup
+# Helper: track processed files for incremental load
 ##########################
-#load documents 
+def load_file_tracker():
+    if os.path.exists(file_tracker_path):
+        with open(file_tracker_path, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_file_tracker(tracker):
+    os.makedirs(chroma_dir, exist_ok=True)
+    with open(file_tracker_path, "w") as f:
+        json.dump(tracker, f)
+
+##########################
+# Build / load Chroma vector store incrementally
+##########################
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=openai_token
+)
+docsearch = None
+file_tracker = load_file_tracker()
+
+# Load existing Chroma if it exists
+if os.path.exists(chroma_dir) and os.listdir(chroma_dir):
+    print("Loading existing Chroma vector store...")
+    docsearch = Chroma(
+        persist_directory=chroma_dir,
+        embedding_function=embeddings
+    )
+else:
+    os.makedirs(chroma_dir, exist_ok=True)
+
+# Load all documents from data dir
 loader = DirectoryLoader(data_dir, glob="*.txt")
 docs = loader.load()
 
-#for each document pulled, loop through it and split the text, saving it to a list
-docs_list = []
+texts_to_add = []
+metadatas_to_add = []
+ids_to_add = []
+
 for doc in docs:
-    text = text_splitter.split_text(doc.page_content) #drill into the content to split
-    docs_list.append(text)
-#now merge these sublists back together
-texts = [item for sublist in docs_list for item in sublist]
+    file_path = doc.metadata["source"]  # DirectoryLoader sets 'source' to file path
+    file_mod_time = os.path.getmtime(file_path)
 
-#create metadata for each chunk
-metadatas = [{"source": f"{i+1}-pl"} for i in range(len(texts))]
+    # Only process if new or updated
+    if file_path not in file_tracker or file_tracker[file_path] < file_mod_time:
+        chunks = text_splitter.split_text(doc.page_content)
+        texts_to_add.extend(chunks)
+        metadatas_to_add.extend([{"source": os.path.basename(file_path)} for _ in chunks])
+        ids_to_add.extend([str(uuid.uuid5(uuid.NAMESPACE_DNS, os.path.basename(file_path) + str(i)))
+                           for i in range(len(chunks))])
+        file_tracker[file_path] = file_mod_time
 
-#create a Chroma vector store
-embeddings = OpenAIEmbeddings()
-docsearch = Chroma.from_texts(
-    texts, embeddings, metadatas=metadatas
-)
-
-##########################
-    #LLM Setup
-##########################
-
-system_template = """Use the following pieces of context to answer the users question.
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-ALWAYS return a "SOURCES" part in your answer.
-The "SOURCES" part should be a reference to the source of the document from which you got your answer.
-
-And if the user greets with greetings like Hi, hello, How are you, etc reply accordingly as well.
-
-Example of your response should be:
-
-The answer is foo
-SOURCES: xyz
-
-
-Begin!
-----------------
-{summaries}"""
-
-messages = [
-    SystemMessagePromptTemplate.from_template(system_template),
-    HumanMessagePromptTemplate.from_template("{question}"),
-]
-prompt = ChatPromptTemplate.from_messages(messages)
-chain_type_kwargs = {"prompt": prompt}
+# Add new texts to Chroma
+if texts_to_add:
+    if docsearch is None:
+        print("Building new Chroma vector store from documents...")
+        docsearch = Chroma.from_texts(
+            texts_to_add,
+            embeddings,
+            metadatas=metadatas_to_add,
+            ids=ids_to_add,
+            persist_directory=chroma_dir
+        )
+    else:
+        print(f"Adding {len(texts_to_add)} new chunks to Chroma store...")
+        docsearch.add_texts(texts_to_add, metadatas=metadatas_to_add, ids=ids_to_add)
+        docsearch.persist()
+    save_file_tracker(file_tracker)
+    print("Chroma store updated and file tracker saved.")
+else:
+    print("No new documents to add. Using existing Chroma store.")
 
 ##########################
-    #App Setup
+# Chainlit: rename bot
 ##########################
-
-##-->Unhide below to include login (need to setup chainlit cloud), necessary for chat history and feedback
-# @cl.password_auth_callback
-# def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
-#   # Fetch the user matching username from your database
-#   # and compare the hashed password with the value stored in the database
-#   if (username, password) == ("admin", "admin"):
-#     return cl.AppUser(username="admin", role="ADMIN", provider="credentials")
-#   else:
-#     return None
-
-##-->Unhide below to change bot name
 @cl.author_rename
 def rename(orig_author: str):
-    rename_dict = {"Chatbot": {bot_name}}
+    rename_dict = {"Chatbot": bot_name}
     return rename_dict.get(orig_author, orig_author)
+
+##########################
+# Chainlit: chat start
+##########################
+# Session-based in-memory chat histories
+session_histories = {}
+
+def get_history(session_id: str):
+    if session_id not in session_histories:
+        session_histories[session_id] = ChatMessageHistory()
+    return session_histories[session_id]
 
 @cl.on_chat_start
 async def on_chat_start():
-
-    message_history = ChatMessageHistory()
-
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        output_key="answer",
-        chat_memory=message_history,
-        return_messages=True,
-    )
-
-    # Create a chain that uses the Chroma vector store
-    chain = ConversationalRetrievalChain.from_llm(
-        ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0, streaming=True),
+    # Build your RetrievalQA chain (classic)
+    base_chain = RetrievalQA.from_chain_type(
+        llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0, streaming=True),
         chain_type="stuff",
         retriever=docsearch.as_retriever(),
-        memory=memory,
         return_source_documents=True,
+    )
+
+    # Wrap it with RunnableWithMessageHistory to handle per-session chat history
+    chain = RunnableWithMessageHistory(
+        base_chain,
+        get_session_history=get_history,
+        input_messages_key="question",    # key for user input in the chain
+        history_messages_key="chat_history"  # key where chat history will be injected
     )
 
     cl.user_session.set("chain", chain)
 
+##########################
+# Chainlit: message handler
+##########################
 @cl.on_message
 async def main(message: cl.Message):
-    # Your custom logic goes here...
-    chain = cl.user_session.get("chain")  # type: ConversationalRetrievalChain
+    chain: RunnableWithMessageHistory = cl.user_session.get("chain")
     cb = cl.AsyncLangchainCallbackHandler()
 
-    res = await chain.acall(message.content, callbacks=[cb])
+    # Use the Chainlit session ID to fetch the correct history
+    session_id = cl.user_session.get_id()
+    res = await chain.invoke(
+        {"question": message.content},
+        config={"configurable": {"session_id": session_id}},
+        callbacks=[cb]
+    )
+
     answer = res["answer"]
-    source_documents = res["source_documents"]  # type: List[Document]
+    source_documents = res.get("source_documents", [])
 
-    text_elements = []  # type: List[cl.Text]
-
+    text_elements = []
     if source_documents:
-        for source_idx, source_doc in enumerate(source_documents):
-            source_name = f"source_{source_idx}"
-            # Create the text element referenced in the message
+        for idx, source_doc in enumerate(source_documents):
+            source_name = f"source_{idx}"
             text_elements.append(
                 cl.Text(content=source_doc.page_content, name=source_name)
             )
         source_names = [text_el.name for text_el in text_elements]
-
         if source_names:
             answer += f"\nSources: {', '.join(source_names)}"
         else:
             answer += "\nNo sources found"
-    # Send a response back to the user
-    await cl.Message(content=answer, elements=text_elements).send()
 
+    await cl.Message(content=answer, elements=text_elements).send()

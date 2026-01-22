@@ -18,7 +18,8 @@ Chat with your Notion documentation using OpenAI API. This sets up a path for pr
 
 
 5. Create an OpenAI API key [here](https://platform.openai.com/api-keys)
-    - Note, this will charge you based on utilization
+    - Note, this will charge you based on creating embeddings and asking questions on access
+    - Can add [budets and alerts](https://platform.openai.com/settings/organization/limits)
 6. Add the API key to your `.env` file
 
 ## Usage
